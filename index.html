@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dynamic weather app with current conditions, hourly forecasts, and 10-day forecasts">
+    <title>Weather</title>
+    <link rel="stylesheet" href="weather.css">
+</head>
+<body>
+    <div class="weather-bg"></div>
+
+    <div class="container">
+        <!-- Header with location search -->
+        <header>
+            <h2 style="margin: 0; color: var(--text-color);">Weather</h2>
+            <form class="location-form">
+                <button type="button" title="Use my location">📍</button>
+                <input type="text" placeholder="Search location..." name="location">
+            </form>
+        </header>
+
+        <!-- Alerts -->
+        <div class="alerts-container"></div>
+
+        <!-- Current conditions hero -->
+        <div class="current-hero"></div>
+
+        <!-- Current details -->
+        <div class="current-details"></div>
+
+        <!-- Air Quality -->
+        <div class="aqi-card"></div>
+
+        <!-- Hourly chart -->
+        <section class="hourly-section">
+            <h2 class="section-title">Hourly Forecast</h2>
+            <canvas id="hourlyChart"></canvas>
+        </section>
+
+        <!-- Daily forecast -->
+        <section class="forecast-section">
+            <h2 class="section-title">10-Day Forecast</h2>
+            <div class="forecast-container"></div>
+        </section>
+
+        <!-- Moon phase -->
+        <section class="moon-section"></section>
+
+        <!-- Footer -->
+        <footer>
+            <p>
+                Weather data from <a href="https://openweathermap.org/" target="_blank">OpenWeatherMap</a> |
+                <a href="https://github.com/sanvash/weather" target="_blank">Source</a>
+            </p>
+            <p id="update-time" style="font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.6;"></p>
+        </footer>
+    </div>
+
+    <!-- Chart.js for hourly chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+
+    <!-- App logic -->
+    <script src="weather.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# API Configuration - NEVER commit this file
+config.php
+
+# Local development
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Backups
+*.bak
+*.backup
+*.tmp
+
+# Node modules (if we ever add npm packages)
+node_modules/
+package-lock.json
+
+# IDE
+.sublime-project
+.sublime-workspace
