@@ -9,6 +9,7 @@ let forecastData = {};
 let hourlyData = {};
 let alertsData = {};
 let aqiData = {};
+let hourlyChart = null;
 
 const weatherConditionMap = {
     // Thunderstorm (2xx)
@@ -39,9 +40,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    await fetchAllData(lat, lon);
-    render();
     setupSearchForm();
+
+    // Fetch current conditions first and render immediately
+    try {
+        const current = await fetch(`${API_BASE}?action=weather&lat=${lat}&lon=${lon}`).then(r => r.json());
+        if (current.error) throw new Error(current.error);
+        currentData = current;
+        renderCurrentHero();
+        renderCurrentDetails();
+        updateBackground();
+    } catch (error) {
+        console.error('Failed to fetch current weather:', error);
+    }
+
+    // Fetch remaining data in parallel and render as available
+    Promise.all([
+        fetch(`${API_BASE}?action=forecast&lat=${lat}&lon=${lon}`).then(r => r.json()).then(data => {
+            forecastData = data;
+            renderForecast();
+            renderMoonPhase();
+        }),
+        fetch(`${API_BASE}?action=hourly&lat=${lat}&lon=${lon}`).then(r => r.json()).then(data => {
+            hourlyData = data;
+            renderHourlyChart();
+        }),
+        fetch(`${API_BASE}?action=alerts&lat=${lat}&lon=${lon}`).then(r => r.json()).then(data => {
+            alertsData = data;
+            renderAlerts();
+        }),
+        fetch(`${API_BASE}?action=aqi&lat=${lat}&lon=${lon}`).then(r => r.json()).then(data => {
+            aqiData = data;
+            renderAQI();
+        })
+    ]).catch(error => console.error('Error fetching additional data:', error));
 });
 
 /**
@@ -101,41 +133,6 @@ function getGeolocation() {
     });
 }
 
-/**
- * Fetch all data from API
- */
-async function fetchAllData(lat, lon) {
-    try {
-        const [current, forecast, hourly, alerts, aqi] = await Promise.all([
-            fetch(`${API_BASE}?action=weather&lat=${lat}&lon=${lon}`).then(r => r.json()),
-            fetch(`${API_BASE}?action=forecast&lat=${lat}&lon=${lon}`).then(r => r.json()),
-            fetch(`${API_BASE}?action=hourly&lat=${lat}&lon=${lon}`).then(r => r.json()),
-            fetch(`${API_BASE}?action=alerts&lat=${lat}&lon=${lon}`).then(r => r.json()),
-            fetch(`${API_BASE}?action=aqi&lat=${lat}&lon=${lon}`).then(r => r.json()),
-        ]);
-
-        console.log('Current weather:', current);
-        console.log('Current data[0]:', current.data ? current.data[0] : 'NO DATA ARRAY');
-        console.log('Forecast:', forecast);
-        console.log('Hourly:', hourly);
-        console.log('Alerts:', alerts);
-        console.log('AQI:', aqi);
-
-        if (current.error) throw new Error(current.error);
-
-        currentData = current;
-        forecastData = forecast;
-        hourlyData = hourly;
-        alertsData = alerts;
-        aqiData = aqi;
-
-        // Store lat/lon for search form
-        window.currentLocation = { lat, lon };
-    } catch (error) {
-        showError('Failed to fetch weather data: ' + error.message);
-        throw error;
-    }
-}
 
 /**
  * Main render function
@@ -210,6 +207,8 @@ function renderCurrentDetails() {
     if (!current) return;
 
     const { temp, feels_like, humidity, wind_speed, wind_deg, wind_gust, visibility, dew_point, sunrise, sunset, uvi } = current;
+    const sunriseTime = new Date(sunrise * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const sunsetTime = new Date(sunset * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     // Convert wind speed m/s to km/h
     const windSpeedKmh = (wind_speed * 3.6).toFixed(1);
@@ -220,10 +219,6 @@ function renderCurrentDetails() {
 
     // UV index label
     const uviLabel = getUVILabel(uvi);
-
-    // Format sunrise/sunset
-    const sunriseTime = new Date(sunrise * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const sunsetTime = new Date(sunset * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const html = `
         <div class="detail-card">
@@ -327,7 +322,18 @@ function renderHourlyChart() {
 
     const ctx = document.getElementById('hourlyChart').getContext('2d');
 
-    new Chart(ctx, {
+    // Destroy existing chart if it exists
+    if (hourlyChart) {
+        hourlyChart.destroy();
+    }
+
+    // Determine text color based on current background condition
+    const condition = document.body.getAttribute('data-condition') || 'clear-day';
+    const darkConditions = ['clear-night', 'cloudy-night', 'rain', 'thunderstorm'];
+    const textColor = darkConditions.includes(condition) ? '#f0f0f0' : '#1a1a1a';
+    const gridColor = darkConditions.includes(condition) ? 'rgba(240, 240, 240, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+    hourlyChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -337,10 +343,10 @@ function renderHourlyChart() {
                     data: temperatures,
                     borderColor: '#FF6B6B',
                     backgroundColor: 'rgba(255, 107, 107, 0.1)',
-                    borderWidth: 3,
+                    borderWidth: 2.5,
                     fill: true,
                     tension: 0.4,
-                    pointRadius: 2,
+                    pointRadius: 1,
                     pointBackgroundColor: '#FF6B6B',
                     yAxisID: 'y',
                 },
@@ -366,7 +372,7 @@ function renderHourlyChart() {
                 legend: {
                     display: true,
                     labels: {
-                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-color') || '#1a1a1a',
+                        color: textColor,
                         boxWidth: 12,
                         padding: 15
                     }
@@ -386,7 +392,10 @@ function renderHourlyChart() {
                         color: '#FF6B6B'
                     },
                     ticks: {
-                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-color') || '#1a1a1a'
+                        color: textColor
+                    },
+                    grid: {
+                        color: gridColor
                     }
                 },
                 y1: {
@@ -399,7 +408,7 @@ function renderHourlyChart() {
                         color: '#5DADE2'
                     },
                     ticks: {
-                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-color') || '#1a1a1a'
+                        color: textColor
                     },
                     grid: {
                         drawOnChartArea: false
@@ -407,7 +416,10 @@ function renderHourlyChart() {
                 },
                 x: {
                     ticks: {
-                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-color') || '#1a1a1a'
+                        color: textColor
+                    },
+                    grid: {
+                        color: gridColor
                     }
                 }
             }
@@ -426,7 +438,9 @@ function renderForecast() {
 
     const html = forecastData.data.slice(0, 10).map(day => {
         const date = new Date(day.dt * 1000);
-        const dayName = date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const dayName = `${dayNames[date.getDay()]} ${monthNames[date.getMonth()]} ${date.getDate()}`;
 
         // Extract weather from hourly data for this day since daily doesn't include it
         const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 1000;
@@ -475,22 +489,22 @@ function renderMoonPhase() {
     const moonrise = dayData.moonrise && dayData.moonrise > 0 ? new Date(dayData.moonrise * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
     const moonset = dayData.moonset && dayData.moonset > 0 ? new Date(dayData.moonset * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
 
-    // Get moon phase icon (simple SVG or emoji)
+    // Get moon phase icon (emoji)
     const moonIcon = getMoonPhaseIcon(moonPhase);
 
     const html = `
-        <div class="moon-icon">
-            ${moonIcon}
+        <div class="moon-card">
+            <div class="moon-icon">${moonIcon}</div>
+            <div class="moon-label">Phase</div>
+            <div class="moon-time">${(moonPhase * 100).toFixed(0)}%</div>
         </div>
-        <div class="moon-info">
-            <div>
-                <div class="moon-label">Moonrise</div>
-                <div class="moon-time">${moonrise}</div>
-            </div>
-            <div>
-                <div class="moon-label">Moonset</div>
-                <div class="moon-time">${moonset}</div>
-            </div>
+        <div class="moon-card">
+            <div class="moon-label">Moonrise</div>
+            <div class="moon-time">${moonrise}</div>
+        </div>
+        <div class="moon-card">
+            <div class="moon-label">Moonset</div>
+            <div class="moon-time">${moonset}</div>
         </div>
     `;
 
@@ -532,23 +546,38 @@ function updateBackground() {
  * Setup address search form
  */
 function setupSearchForm() {
-    const form = document.querySelector('.location-form');
-    const input = form.querySelector('input');
-    const geoButton = form.querySelector('button');
+    const form = document.getElementById('locationForm');
+    const input = document.getElementById('locationInput');
+    const geoButton = document.getElementById('geoButton');
 
-    input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+    if (form) {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
-            searchLocation(input.value);
-        }
-    });
-
-    geoButton.addEventListener('click', () => {
-        const geo = getGeolocation();
-        geo.then(({ lat, lon }) => {
-            window.location.href = `?lat=${lat}&lon=${lon}`;
+            if (input.value.trim()) {
+                searchLocation(input.value.trim());
+            }
         });
-    });
+    }
+
+    if (input) {
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (input.value.trim()) {
+                    searchLocation(input.value.trim());
+                }
+            }
+        });
+    }
+
+    if (geoButton) {
+        geoButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            getGeolocation().then(({ lat, lon }) => {
+                window.location.href = `?lat=${lat}&lon=${lon}`;
+            });
+        });
+    }
 }
 
 /**

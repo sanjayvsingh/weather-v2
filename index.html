@@ -14,9 +14,9 @@
         <!-- Header with location search -->
         <header>
             <h2 style="margin: 0; color: var(--text-color);">Weather</h2>
-            <form class="location-form">
-                <button type="button" title="Use my location">📍</button>
-                <input type="text" placeholder="Search location..." name="location">
+            <form class="location-form" id="locationForm">
+                <button type="button" title="Use my location" id="geoButton">📍</button>
+                <input type="text" placeholder="Search location..." id="locationInput" autocomplete="off">
             </form>
         </header>
 
@@ -24,13 +24,18 @@
         <div class="alerts-container"></div>
 
         <!-- Current conditions hero -->
-        <div class="current-hero"></div>
+        <div class="current-hero">
+            <div class="current-alerts"></div>
+        </div>
 
         <!-- Current details -->
         <div class="current-details"></div>
 
         <!-- Air Quality -->
-        <div class="aqi-card"></div>
+        <section>
+            <h2 class="section-title">Air Quality Index</h2>
+            <div class="aqi-card"></div>
+        </section>
 
         <!-- Hourly chart -->
         <section class="hourly-section">
@@ -45,7 +50,10 @@
         </section>
 
         <!-- Moon phase -->
-        <section class="moon-section"></section>
+        <section>
+            <h2 class="section-title">Moon Phase</h2>
+            <div class="moon-section"></div>
+        </section>
 
         <!-- Footer -->
         <footer>
